@@ -1,0 +1,36 @@
+**/__pycache__/**
+**/*.egg-info/
+.cursor/*
+!.cursor/skills/
+**/.venv/**
+**/checkpoints/**
+train_out/
+checkpoints/
+runs/
+Log/
+logs/
+.cache/
+
+# H_RDT local artifacts and large model assets
+policy/H_RDT/.cache/
+policy/H_RDT/H_RDT/.cache/
+policy/H_RDT/H_RDT/t5-v1_1-xxl/
+policy/H_RDT/**/logs/
+policy/H_RDT/**/wandb/
+
+# Local datasets and reusable virtual environments
+data/
+data_wrong!!!!_wo_flip/
+**/.venv
+pretrain_model/*
+
+# RLDX local runs, caches, snapshots, and editor backups
+.codex-backups/
+policy/RLDX_1/.codex-backups/
+policy/RLDX_1/checkpoints*/
+policy/RLDX_1/wandb/
+policy/RLDX_1/*.bak
+policy/RLDX_1/*.pre_*
+policy/RLDX_1/*.pre-*
+policy/RLDX_1/*.py20??-??-??
+policy/RLDX_1/data_scripts/
