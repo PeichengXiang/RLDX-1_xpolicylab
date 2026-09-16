@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 XPL_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 UPSTREAM="${SCRIPT_DIR}/RLDX-1"
-CONVERTER="${XPL_ROOT}/scripts/convert_spark0_bench_to_lerobot_v21_joint54.py"
+CONVERTER="${XPL_ROOT}/data_scripts/convert_sparkarena_7task_v21_joint54.py"
 PYTHON_BIN="${RLDX_PYTHON_BIN:-${UPSTREAM}/.venv/bin/python}"
 
 if [[ ! -f "${CONVERTER}" ]]; then
@@ -17,7 +17,7 @@ if [[ ! -x "${PYTHON_BIN}" ]]; then
     exit 1
 fi
 
-# With no arguments, the converter reads /mnt/xspark-data/tjy/spark0_bench
-# and writes data/Spark0_bench_lerobotV21_joint54.  Any provided flags are
-# forwarded verbatim so conversion remains owned by the repository script.
+# With no arguments, the converter uses its documented SparkArena 7-task source
+# and writes the same dataset directory that train.sh uses by default. Any
+# provided flags are forwarded verbatim so callers can supply portable paths.
 exec "${PYTHON_BIN}" "${CONVERTER}" "$@"

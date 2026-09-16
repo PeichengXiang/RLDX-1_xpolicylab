@@ -6,7 +6,7 @@
 
 Shared conventions — argument meanings, checkpoint naming, split-machine deployment, `EVAL_ENV_TYPE` — are documented in the [XPolicyLab README](../../README.md). Official results: [RoboDojo LeaderBoard](https://robodojo-benchmark.com/LeaderBoard).
 
-The EgoVLA state/action order is left arm, left hand, right arm, right hand. The private registry at `utils/robot/_robot_info.json` records `ego_h1_inspire` as 7, 12, 7, and 12 (38 total); `model.py` uses it before consulting the shared registry so a broken `/personal` symlink cannot prevent evaluation. The RLDX recipe uses four RGB frames at stride two, three cameras, a 16-step action horizon, `GENERAL_EMBODIMENT`, and absolute joint actions.
+The EgoVLA state/action order is left arm, left hand, right arm, right hand. The private registry at `utils/robot/_robot_info.json` records `ego_h1_inspire` as 7, 12, 7, and 12 (38 total). The RLDX recipe uses four RGB frames at stride two, three cameras, a 16-step action horizon, and `GENERAL_EMBODIMENT`. The dataset stores the next observed absolute qpos. During training, `egovla_joint38_config.py` converts both arm groups to `RELATIVE` deltas while keeping both hand groups `ABSOLUTE`; inference converts arm deltas back to joint-position targets. `action_type=joint` names the control space, not the absolute/relative representation. The audited external EgoVLA bridge scatters these 38 arm/hand targets into the simulator's 50-joint action and preserves the current qpos for the 12 leg joints.
 
 ## Installation
 
@@ -16,10 +16,11 @@ The policy side uses the upstream Python 3.10 `uv` environment. The install entr
 bash install.sh
 ```
 
-Runnable example:
+Fresh-clone example:
 
 ```bash
-cd /personal/xiangpc/0811_Xpolicylab_bench/RLDX_1/policy/RLDX_1
+git clone --recurse-submodules https://github.com/PeichengXiang/RLDX-1_xpolicylab.git
+cd RLDX-1_xpolicylab/policy/RLDX_1
 bash install.sh
 ```
 
@@ -33,11 +34,14 @@ This runs the official `uv sync --python 3.10` recipe, installs RLDX-1 and XPoli
 bash process_data.sh [converter_args...]
 ```
 
-Runnable default conversion:
+From the repository root, convert all seven SparkArena tasks into the directory
+used by `train.sh`:
 
 ```bash
-cd /personal/xiangpc/0811_Xpolicylab_bench/RLDX_1/policy/RLDX_1
-bash process_data.sh
+cd policy/RLDX_1
+bash process_data.sh \
+  --source-root /path/to/spark0_bench_7tasks \
+  --output-root ../../data/spark0_bench_7task_0908
 ```
 
 The converted EgoVLA data used by this checkout is `data/EgoVLA_benchmark_rldx_v21`. The output must be LeRobot v2.1 and contain `meta/modality.json`; state/action slices must expose `left_arm`, `left_hand`, `right_arm`, and `right_hand`, while video exposes `cam_head`, `cam_left_wrist`, and `cam_right_wrist`. Offline image decoding is owned by the converter and must use `XPolicyLab.utils.process_data.decode_image_bit`.
@@ -53,7 +57,7 @@ bash train.sh <bench_name> <ckpt_name> <env_cfg_type> joint <seed> <gpu_ids>
 Runnable eight-GPU example:
 
 ```bash
-cd /personal/xiangpc/0811_Xpolicylab_bench/RLDX_1/policy/RLDX_1
+cd policy/RLDX_1
 bash train.sh Spark0_bench rldx1_ft tianji_marvin_wuji joint 0 0,1,2,3,4,5,6,7
 ```
 
@@ -89,15 +93,18 @@ Runnable EgoVLA trained-checkpoint example (the final checkpoint path may be a
 `checkpoint-80000` child):
 
 ```bash
-cd /mnt/xspark-data/xiangpc/0811_Xpolicylab_bench/RLDX_1/policy/RLDX_1
-RLDX_POLICY_PYTHON_BIN=/mnt/xspark-data/xiangpc/.uv-python/cpython-3.10.20-linux-x86_64-gnu/bin/python3.10 \
-RLDX_POLICY_SITE_PACKAGES=/mnt/xspark-data/xiangpc/old_sim_eval/0807_RLDX-1/policy/RLDX_1/RLDX-1/.venv/lib/python3.10/site-packages \
-RLDX_EVAL_PYTHON_BIN="/mnt/xspark-data/xiangpc/EgoVLA benchmark/.runtime/conda/egovla-isaaclab-1.2.0/bin/python" \
+XPL_ROOT="$(git rev-parse --show-toplevel)"
+POLICY_DIR="${XPL_ROOT}/policy/RLDX_1"
+EVAL_ENV_PATH=/path/to/egovla-isaaclab-1.2.0
+export EVAL_MAIN_ROOT=/path/to/EgoVLA
+export RLDX_POLICY_PYTHON_BIN="${POLICY_DIR}/RLDX-1/.venv/bin/python"
+export RLDX_POLICY_SITE_PACKAGES="${POLICY_DIR}/RLDX-1/.venv/lib/python3.10/site-packages"
+export RLDX_EVAL_PYTHON_BIN="${EVAL_ENV_PATH}/bin/python"
+cd "${POLICY_DIR}"
 bash eval.sh EgoVLA close_drawer \
   /absolute/path/to/checkpoint-80000 \
   ego_h1_inspire joint 0 0 0 \
-  /mnt/xspark-data/xiangpc/.uv-python/cpython-3.10.20-linux-x86_64-gnu \
-  "/mnt/xspark-data/xiangpc/EgoVLA benchmark/.runtime/conda/egovla-isaaclab-1.2.0"
+  "${POLICY_DIR}/RLDX-1/.venv" "${EVAL_ENV_PATH}"
 ```
 
 Checkpoint roots follow `XPolicyLab.utils.checkpoint_resolver` precedence: an explicit `model_path`, `ckpt_name` supplied as a path, the standard concatenated run name, then `checkpoints/<ckpt_name>`. Historical bare-path and `pretrain_model/<ckpt_name>` locations remain lower-priority compatibility fallbacks. If a resolved run directory contains `checkpoint-*` children, the largest numeric step is loaded.
@@ -106,20 +113,12 @@ The reserved `ckpt_name=debug` skips RLDX weight loading and returns zero action
 
 ```bash
 EVAL_ENV_TYPE=debug \
-RLDX_POLICY_PYTHON_BIN=/mnt/xspark-data/xiangpc/.uv-python/cpython-3.10.20-linux-x86_64-gnu/bin/python3.10 \
-RLDX_POLICY_SITE_PACKAGES=/mnt/xspark-data/xiangpc/old_sim_eval/0807_RLDX-1/policy/RLDX_1/RLDX-1/.venv/lib/python3.10/site-packages \
-RLDX_EVAL_PYTHON_BIN="/mnt/xspark-data/xiangpc/EgoVLA benchmark/.runtime/conda/egovla-isaaclab-1.2.0/bin/python" \
 RLDX_DEBUG_EPISODES=1 bash eval.sh EgoVLA close_drawer debug \
-  ego_h1_inspire joint 0 0 0 /mnt/xspark-data/xiangpc/.uv-python/cpython-3.10.20-linux-x86_64-gnu \
-  "/mnt/xspark-data/xiangpc/EgoVLA benchmark/.runtime/conda/egovla-isaaclab-1.2.0"
+  ego_h1_inspire joint 0 0 0 "${POLICY_DIR}/RLDX-1/.venv" "${EVAL_ENV_PATH}"
 
 DEBUG_OBS_ENCODED=1 EVAL_ENV_TYPE=debug \
-RLDX_POLICY_PYTHON_BIN=/mnt/xspark-data/xiangpc/.uv-python/cpython-3.10.20-linux-x86_64-gnu/bin/python3.10 \
-RLDX_POLICY_SITE_PACKAGES=/mnt/xspark-data/xiangpc/old_sim_eval/0807_RLDX-1/policy/RLDX_1/RLDX-1/.venv/lib/python3.10/site-packages \
-RLDX_EVAL_PYTHON_BIN="/mnt/xspark-data/xiangpc/EgoVLA benchmark/.runtime/conda/egovla-isaaclab-1.2.0/bin/python" \
 RLDX_DEBUG_EPISODES=1 bash eval.sh EgoVLA close_drawer debug \
-  ego_h1_inspire joint 0 0 0 /mnt/xspark-data/xiangpc/.uv-python/cpython-3.10.20-linux-x86_64-gnu \
-  "/mnt/xspark-data/xiangpc/EgoVLA benchmark/.runtime/conda/egovla-isaaclab-1.2.0"
+  ego_h1_inspire joint 0 0 0 "${POLICY_DIR}/RLDX-1/.venv" "${EVAL_ENV_PATH}"
 ```
 
 Debug mode validates adapter transport, action keys, and shapes; it does not validate numerical RLDX inference.
@@ -136,13 +135,14 @@ policy/RLDX_1/
 └── checkpoints/                  # fine-tuning outputs
 
 pretrain_model/
-└── RLDX-1-PT-1592013a -> <usable pretrained checkpoint>
+├── RLDX-1-PT-1592013a/          # official pretrained checkpoint
+└── hf_home/                     # metadata-only RLDX-1-VLM Hub cache
 
 data/
 └── EgoVLA_benchmark_rldx_v21/
 ```
 
-The reserved `ckpt_name=pretrain` uses `pretrained_model_path`, which defaults to the documented pretrain symlink. A base PT checkpoint normally lacks EgoVLA modality statistics, so real evaluation should use an EgoVLA fine-tuned checkpoint.
+Both asset directories are ignored by Git and must be prepared separately. The reserved `ckpt_name=pretrain` uses `pretrained_model_path`, which defaults to the checkpoint directory shown above. A base PT checkpoint normally lacks EgoVLA modality statistics, so real evaluation should use an EgoVLA fine-tuned checkpoint.
 
 ## Configuration
 
@@ -165,7 +165,7 @@ Model-specific `deploy.yml` keys:
 ## Notes
 
 - Only the dual-arm EgoVLA `joint` representation is supported; `ee` is rejected.
-- `model.py` receives server-decoded RGB arrays and performs neither image decoding nor channel swapping.
+- `model.py` receives server-decoded RGB arrays. SparkArena checkpoints that were trained from OpenCV BGR frames enable a compatibility RGB-to-BGR swap; EgoVLA inputs remain RGB.
 - A fine-tuned checkpoint must carry EgoVLA joint38 modality keys and normalization statistics; incompatible checkpoints fail fast.
-- The nested upstream checkout and pretrained weights are not modified by this adapter.
+- `install.sh` applies the tracked inference-precision patch to the pinned upstream checkout; pretrained weights remain unchanged.
 - Full training and real checkpoint inference require the converted dataset, installed `uv` environment, and actual weights.

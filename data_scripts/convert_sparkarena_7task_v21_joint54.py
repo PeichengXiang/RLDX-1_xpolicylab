@@ -44,7 +44,7 @@ from utils.process_data import decode_image_bit  # noqa: E402
 
 
 DEFAULT_SOURCE = Path("/personal/xspark_shared/hand_data/hdf5/spark0_bench_7tasks")
-DEFAULT_OUTPUT = REPO_ROOT / "data" / "Spark0_bench_lerobotV21_joint54"
+DEFAULT_OUTPUT = REPO_ROOT / "data" / "spark0_bench_7task_0908"
 TASK_NAMES = (
     "click_mouse",
     "collect_objects",

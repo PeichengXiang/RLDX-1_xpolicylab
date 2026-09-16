@@ -1,3 +1,9 @@
+# RLDX-1_xpolicylab
+
+This repository is a portable XPolicyLab snapshot for the RLDX-1 integration.
+Start with the [RLDX-1 adapter guide](policy/RLDX_1/README.md) for SparkArena and
+EgoVLA data contracts, training, checkpoint layout, and evaluation commands.
+
 <div align="center">
 
 <img src="assets/logo.png" alt="XPolicyLab"/>
@@ -59,7 +65,7 @@ Top-level adapters live in `policy/`. Each policy README documents that model's 
 - [DreamZero](policy/DreamZero/README.md), [EventVLA](policy/EventVLA/README.md), [FastWAM](policy/FastWAM/README.md), [GO1](policy/GO1/README.md), [GR00T_N17](policy/GR00T_N17/README.md), [GalaxeaVLA](policy/GalaxeaVLA/README.md)
 - [GigaWorldPolicy](policy/GigaWorldPolicy/README.md), [H_RDT](policy/H_RDT/README.md), [Hy_Embodied_05_VLA](policy/Hy_Embodied_05_VLA/README.md), [InternVLA_A1](policy/InternVLA_A1/README.md), [InternVLA_A1_5](policy/InternVLA_A1_5/README.md), [LDA_1B](policy/LDA_1B/README.md)
 - [LingBot_VA](policy/LingBot_VA/README.md), [LingBot_VLA](policy/LingBot_VLA/README.md), [Mem_0](policy/Mem_0/README.md), [MolmoACT2](policy/MolmoACT2/README.md)
-- [OpenVLA_OFT](policy/OpenVLA_OFT/README.md), [Pi_0](policy/Pi_0/README.md), [Pi_05](policy/Pi_05/README.md), [Pi_0_Fast](policy/Pi_0_Fast/README.md), [RDT_1B](policy/RDT_1B/README.md), [RISE](policy/RISE/README.md)
+- [OpenVLA_OFT](policy/OpenVLA_OFT/README.md), [Pi_0](policy/Pi_0/README.md), [Pi_05](policy/Pi_05/README.md), [Pi_0_Fast](policy/Pi_0_Fast/README.md), [RDT_1B](policy/RDT_1B/README.md), [RISE](policy/RISE/README.md), [RLDX_1](policy/RLDX_1/README.md)
 - [SmolVLA](policy/SmolVLA/README.md), [Spatial_Forcing](policy/Spatial_Forcing/README.md), [Spirit_v15](policy/Spirit_v15/README.md), [TinyVLA](policy/TinyVLA/README.md), [X_VLA](policy/X_VLA/README.md), [X_WAM](policy/X_WAM/README.md), [Xiaomi_Robotics_0](policy/Xiaomi_Robotics_0/README.md), [Xiaomi_Robotics_1](policy/Xiaomi_Robotics_1/README.md), [starVLA](policy/starVLA/README.md)
 
 **Baselines and examples**
@@ -184,31 +190,29 @@ Use policy/demo_policy as the reference.
 
 ## ⚡ Quick Start
 
-Clone XPolicyLab as a normal Python project for adapter development, offline checks, training from prepared data, or your own environment client:
+Clone this repository with its pinned RLDX-1 submodule:
 
 ```bash
-mkdir demo_env
-cd demo_env
-git clone https://github.com/XPolicyLab/XPolicyLab.git
-cd XPolicyLab
+git clone --recurse-submodules https://github.com/PeichengXiang/RLDX-1_xpolicylab.git
+cd RLDX-1_xpolicylab
 pip install -e .
 ```
 
-You do not need a simulator to start model-side development: the bundled downloader fetches prepared RoboDojo data — several simulator export versions plus HDF5 `RoboDojo_real` real-world data — for training and offline debugging. If you use `XPolicyLab/` as a subpackage inside the RoboDojo repository, follow RoboDojo's own data download scripts instead.
+You do not need a simulator to start model-side development: the bundled downloader fetches prepared RoboDojo data — several simulator export versions plus HDF5 `RoboDojo_real` real-world data — for training and offline debugging. If you use this checkout as a subpackage inside the RoboDojo repository, follow RoboDojo's own data download scripts instead.
 
-Download a small Hugging Face demo bundle and keep the data next to `XPolicyLab/`:
+Download a small Hugging Face demo bundle and keep the data next to the repository:
 
 ```bash
-# From demo_env/XPolicyLab
+# From RLDX-1_xpolicylab/
 bash scripts/RoboDojo/download_robodojo_data.sh demo
 ```
 
 This creates:
 
 ```text
-demo_env/
-├── data/        # demo data, including a small 10-episode HuggingFace bundle
-└── XPolicyLab/
+workspace/
+├── data/                    # demo data, including a small 10-episode HuggingFace bundle
+└── RLDX-1_xpolicylab/
 ```
 
 The same script pulls the full exports — `hdf5`, `lerobot_v3.0`, `lerobot_v2.1`, and `real` (real-world HDF5) — each into its own `../data/` folder.

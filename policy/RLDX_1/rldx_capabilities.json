@@ -3,7 +3,10 @@
   "benchmark": "EgoVLA",
   "meaning": "Private RLDX_1 evaluation contract; this file is intentionally separate from the benchmark-wide capability whitelist.",
   "native_contract": {
-    "action": "absolute joint position target, shape [num_envs, 50]",
+    "action": "RLDX emits 38 named upper-body joint targets. The audited EgoVLA bridge scatters them into an absolute joint-position target of shape [num_envs, 50] and preserves the current 12-dimensional leg qpos.",
+    "policy_action_dim": 38,
+    "native_action_dim": 50,
+    "projection": "scatter 38 controlled arm/hand joints into audited H1 Inspire indices; preserve the 12 uncontrolled leg joints from the current qpos",
     "control_hz": 30,
     "egovla_robot_key": "h1_inspire",
     "xpolicylab_robot_key": "ego_h1_inspire",

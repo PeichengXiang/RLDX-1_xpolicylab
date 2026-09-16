@@ -47,7 +47,7 @@ if [[ ! -x "${TORCHRUN}" ]]; then
 fi
 if [[ ! -d "${SOURCE_BASE_MODEL_PATH}" ]]; then
     echo "Missing source base model: ${SOURCE_BASE_MODEL_PATH}" >&2
-    echo "Set RLDX_SOURCE_BASE_MODEL_PATH or restore the documented pretrain_model symlink." >&2
+    echo "Set RLDX_SOURCE_BASE_MODEL_PATH or place the downloaded checkpoint under pretrain_model/." >&2
     exit 1
 fi
 for required in meta/info.json meta/episodes.jsonl meta/tasks.jsonl meta/stats.json meta/modality.json; do

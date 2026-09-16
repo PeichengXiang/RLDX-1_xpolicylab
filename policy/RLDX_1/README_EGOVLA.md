@@ -27,7 +27,9 @@ Run on a machine where the verified Pi0.5 LeRobot v3 dataset and its Python
 environment are available:
 
 ```bash
-cd /personal/xiangpc/0811_Xpolicylab_bench/RLDX_1
+SOURCE_DATASET=/path/to/verified-egovla-v3 \
+CONVERTER_PYTHON=/path/to/converter-python \
+RLDX_PYTHON="$PWD/policy/RLDX_1/RLDX-1/.venv/bin/python" \
 bash data_scripts/prepare_egovla_rldx_v21.sh
 ```
 
@@ -43,17 +45,18 @@ data/EgoVLA_benchmark_rldx_v21
 
 Training refuses data whose audit-bound metadata hashes changed.
 
-## A800_13 runtime
+## Training runtime
 
-The rented node exposes the shared filesystem as `/mnt/xspark-data`. The
-launcher uses only assets below `/mnt/xspark-data/xiangpc`, including the clean
-RLDX base checkpoint and the existing Python 3.10 package set. System FFmpeg is
-required by upstream TorchCodec.
+The launcher derives the repository root from its own location. Its default
+dataset, checkpoint, RLDX-1 environment, and Hugging Face metadata cache live
+under this checkout. Override them with `RLDX_DATASET_PATH`,
+`RLDX_BASE_MODEL_PATH`, `RLDX_PYTHON_BIN`, `RLDX_SITE_PACKAGES`, or
+`RLDX_HF_HOME`. System FFmpeg is required by upstream TorchCodec.
 
 One-step, eight-GPU smoke test:
 
 ```bash
-cd /mnt/xspark-data/xiangpc/0811_Xpolicylab_bench/RLDX_1/policy/RLDX_1
+cd policy/RLDX_1
 bash prepare_egovla_full_base_overlay.sh
 bash train_egovla_joint38.sh smoke
 ```
@@ -63,6 +66,8 @@ steps, saving every 10,000 steps, LR 2e-5):
 
 ```bash
 export WANDB_API_KEY='...'
+MAX_STEPS=80000 SAVE_STEPS=10000 \
+RLDX_RUN_NAME=EgoVLA-benchmark-rldx1_joint38-strict-full_80k-ego_h1_inspire-joint-0 \
 bash train_egovla_joint38.sh start
 ```
 
@@ -93,14 +98,18 @@ bash train_egovla_joint38.sh resume
 After a complete checkpoint exists, use the standard adapter entry point:
 
 ```bash
-RLDX_POLICY_PYTHON_BIN=/mnt/xspark-data/xiangpc/.uv-python/cpython-3.10.20-linux-x86_64-gnu/bin/python3.10 \
-RLDX_POLICY_SITE_PACKAGES=/mnt/xspark-data/xiangpc/old_sim_eval/0807_RLDX-1/policy/RLDX_1/RLDX-1/.venv/lib/python3.10/site-packages \
-RLDX_EVAL_PYTHON_BIN="/mnt/xspark-data/xiangpc/EgoVLA benchmark/.runtime/conda/egovla-isaaclab-1.2.0/bin/python" \
+XPL_ROOT="$(git rev-parse --show-toplevel)"
+POLICY_DIR="${XPL_ROOT}/policy/RLDX_1"
+EVAL_ENV_PATH=/path/to/egovla-isaaclab-1.2.0
+export EVAL_MAIN_ROOT=/path/to/EgoVLA
+export RLDX_POLICY_PYTHON_BIN="${POLICY_DIR}/RLDX-1/.venv/bin/python"
+export RLDX_POLICY_SITE_PACKAGES="${POLICY_DIR}/RLDX-1/.venv/lib/python3.10/site-packages"
+export RLDX_EVAL_PYTHON_BIN="${EVAL_ENV_PATH}/bin/python"
+cd "${POLICY_DIR}"
 bash eval.sh EgoVLA <task_name> \
   /absolute/path/to/checkpoint-80000 \
   ego_h1_inspire joint 0 0 0 \
-  /mnt/xspark-data/xiangpc/.uv-python/cpython-3.10.20-linux-x86_64-gnu \
-  "/mnt/xspark-data/xiangpc/EgoVLA benchmark/.runtime/conda/egovla-isaaclab-1.2.0"
+  "${POLICY_DIR}/RLDX-1/.venv" "${EVAL_ENV_PATH}"
 ```
 
 Real numerical inference remains unverified until a trained joint38 checkpoint
