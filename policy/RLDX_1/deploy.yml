@@ -24,6 +24,11 @@ camera_map:
   cam_head: cam_head
   cam_left_wrist: cam_left_wrist
   cam_right_wrist: cam_right_wrist
+input_image_size: [384, 384]
+processor_image_size: [256, 256]
+missing_wrist_policy: black
+swap_rgb_bgr: false
+action_contract: none
 
 # Used only when eval.sh receives the reserved ckpt_name "pretrain".
 # A symlink with this name is created under the strategy's pretrain_model/.

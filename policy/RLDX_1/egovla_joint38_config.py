@@ -1,8 +1,9 @@
 """RLDX modality registration for EgoVLA H1 + Inspire joint38 data.
 
-The stored action is the next observed absolute qpos.  RLDX converts only the
-two arm groups to relative actions at load time; the dexterous hands remain
-absolute.  This matches the XPolicyLab Pi0.5 joint adapter semantics.
+The stored action is the absolute joint command recorded in the source HDF5
+``/action`` dataset. RLDX converts only the two arm groups to deltas from the
+current state at load time; the dexterous hands remain absolute. No future
+observation is used as a training target.
 """
 
 from rldx.configs.data.embodiment_configs import register_modality_config

@@ -1,16 +1,22 @@
-"""Align SparkArena RLDX inference language and color with training.
+"""Align SparkArena RLDX inference language, color, and action with training.
 
 The 0908 SparkArena 7-task run stored directory slugs in ``tasks.jsonl``
 (``hammer_beat``, …) and read videos with OpenCV (BGR). DexBench eval
 feeds full English ``gen_instruction()`` sentences and RGB frames.
 EgoVLA / old Spark0 checkpoints that trained on full English + RGB stay
 on ``as_is`` / no channel swap.
+
+GitHub RLDX training uses arm-relative / hand-absolute actions. Relarm
+SparkArena weights must register that contract so ``decode_action`` adds
+the current arm qpos back before SparkArena executes the chunk.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import re
+from pathlib import Path
 
 SPARKARENA_SHORT_NAMES = (
     "click_mouse",
@@ -63,6 +69,56 @@ def instruction_style_from_checkpoint(
     if _is_sparkarena_checkpoint(checkpoint_path):
         return "short_name"
     return "as_is"
+
+
+def action_contract_from_checkpoint(
+    checkpoint_path: str,
+    explicit: str | None = None,
+) -> str:
+    """Return the relative, absolute, or non-Spark action contract."""
+
+    value = explicit if explicit is not None else os.environ.get("RLDX_ACTION_CONTRACT", "")
+    value = str(value or "").strip().casefold()
+    if value in {"relative", "relarm", "rel"}:
+        return "relative"
+    if value in {"absolute", "abs", "legacy"}:
+        return "absolute"
+    if value in {"none", "off", "egovla"}:
+        return "none"
+
+    text = str(checkpoint_path or "").casefold()
+    if "relarm" in text or "relative" in text:
+        return "relative"
+    for candidate in _checkpoint_config_candidates(checkpoint_path):
+        try:
+            payload = json.loads(candidate.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload.get("use_relative_action"):
+            return "relative"
+        break
+    if "sparkarena" in text or "joint54" in text:
+        return "absolute"
+    return "none"
+
+
+def _checkpoint_config_candidates(checkpoint_path: str) -> list[Path]:
+    root = Path(str(checkpoint_path or "")).expanduser()
+    candidates = [root / "config.json"]
+    if root.name.startswith("checkpoint-"):
+        return candidates
+    numbered = []
+    if root.is_dir():
+        for child in root.glob("checkpoint-*"):
+            if not child.is_dir():
+                continue
+            try:
+                numbered.append((int(child.name.rsplit("-", 1)[1]), child / "config.json"))
+            except ValueError:
+                continue
+    if numbered:
+        candidates.insert(0, max(numbered)[1])
+    return candidates
 
 
 def swap_rgb_bgr_enabled(

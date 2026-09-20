@@ -9,10 +9,13 @@ vendored `RLDX-1/` upstream checkout.
 - robot / `env_cfg_type`: `ego_h1_inspire`
 - `action_type`: `joint`
 - state/action layout: left arm 7, left hand 12, right arm 7, right hand 12
-- stored action: next observed absolute qpos, 38D
+- stored action: source HDF5 `/action`, mapped from native 50D to the policy's
+  absolute commanded joint target, 38D; future state is never used as action
 - RLDX transform: arms `RELATIVE`, hands `ABSOLUTE`
 - cameras: head, left wrist, right wrist; missing raw wrists remain black with
   `observation.camera_mask=0`
+- color / resolution: RGB without a channel swap, stored at 384x384 and passed
+  through the checkpoint processor at 256x256 in both training and inference
 - source frequency: 30 FPS
 - action horizon: 16; video context: 4 frames at stride 2
 
@@ -23,27 +26,29 @@ gradient checkpointing so this surface can be tested on eight 80 GB GPUs.
 
 ## Data
 
-Run on a machine where the verified Pi0.5 LeRobot v3 dataset and its Python
-environment are available:
+First create the raw-action dataset under this project's `data/` directory.
+The command independently clones the already verified videos, replaces the
+legacy next-state action column with the retained source command, then compares
+every episode against the original HDF5 `/action` and `/observations/qpos`:
 
 ```bash
-SOURCE_DATASET=/path/to/verified-egovla-v3 \
-CONVERTER_PYTHON=/path/to/converter-python \
-RLDX_PYTHON="$PWD/policy/RLDX_1/RLDX-1/.venv/bin/python" \
-bash data_scripts/prepare_egovla_rldx_v21.sh
+RLDX_PYTHON_BIN="$PWD/policy/RLDX_1/RLDX-1/.venv/bin/python" \
+bash data_scripts/prepare_egovla_raw_action_v21.sh
 ```
 
-The script hard-links the immutable v3 source into private staging, converts
-only that staging copy to LeRobot v2.1, computes exact absolute and arm-relative
+The script works in private staging, computes exact absolute and arm-relative
 statistics, audits every parquet episode and language label, verifies every
 video frame count, and compares all 1,531,638 compressed packets against the
 exact v3 source slices before atomically publishing:
 
 ```text
-data/EgoVLA_benchmark_rldx_v21
+data/EgoVLA_benchmark_rldx_v21_raw_action
 ```
 
 Training refuses data whose audit-bound metadata hashes changed.
+Before launching, it also exports `egovla_observation.json` beside the run so
+evaluation resizes live 720x1280 RGB cameras to the training resolution and
+uses black 384x384 wrist images for tasks that have no wrist cameras.
 
 ## Training runtime
 

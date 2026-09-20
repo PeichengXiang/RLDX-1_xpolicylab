@@ -6,7 +6,9 @@ before this module is called.
 
 SparkArena 7-task weights trained on directory slugs (``hammer_beat``)
 and OpenCV BGR frames. DexBench sentences are remapped to those slugs,
-and server RGB is swapped to BGR. EgoVLA / old Spark0 stay as-is.
+and server RGB is swapped to BGR. Relarm checkpoints register the GitHub
+arm-relative / hand-absolute contract so RLDX can add current qpos back.
+EgoVLA / old Spark0 stay as-is.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from XPolicyLab.utils.process_data import (
 )
 
 from .instruction_align import (
+    action_contract_from_checkpoint,
     align_instruction,
     instruction_style_from_checkpoint,
     swap_rgb_bgr_enabled,
@@ -82,6 +85,10 @@ class Model(ModelTemplate):
             )
         if not self.env_cfg_type:
             raise ValueError("env_cfg_type must be provided")
+        self._is_egovla = (
+            str(model_cfg.get("bench_name") or "").casefold() == "egovla"
+            or self.env_cfg_type == "ego_h1_inspire"
+        )
 
         # Prefer the policy-local registry.  The shared env_cfg robot registry
         # is a /personal symlink on the split evaluation host and is unavailable
@@ -124,6 +131,27 @@ class Model(ModelTemplate):
         if not isinstance(camera_map, dict) or not camera_map:
             raise ValueError("camera_map must map RLDX video keys to XPolicyLab camera keys")
         self.camera_map = {str(k): str(v) for k, v in camera_map.items()}
+        self.input_image_size = tuple(
+            int(value) for value in model_cfg.get("input_image_size", (384, 384))
+        )
+        self.processor_image_size = tuple(
+            int(value) for value in model_cfg.get("processor_image_size", (256, 256))
+        )
+        self.missing_wrist_policy = str(
+            model_cfg.get("missing_wrist_policy") or "black"
+        ).casefold()
+        if self._is_egovla and self.input_image_size != (384, 384):
+            raise ValueError(
+                "EgoVLA RLDX input images must be 384x384 to match training; "
+                f"got {self.input_image_size}"
+            )
+        if self._is_egovla and self.processor_image_size != (256, 256):
+            raise ValueError(
+                "EgoVLA RLDX processor images must be 256x256 to match training; "
+                f"got {self.processor_image_size}"
+            )
+        if self._is_egovla and self.missing_wrist_policy != "black":
+            raise ValueError("EgoVLA missing_wrist_policy must be 'black'")
         self.language_key = str(
             model_cfg.get("language_key") or "annotation.human.action.task_description"
         )
@@ -148,9 +176,20 @@ class Model(ModelTemplate):
         model_path = self._resolve_checkpoint(model_cfg)
         self._configure_alignment(model_cfg, checkpoint_hint=str(model_path))
         path_text = str(model_path).casefold()
-        if "sparkarena" in path_text or "joint54" in path_text:
-            # Register Spark dual-arm 54D modality before RLDXPolicy loads.
+        action_contract = "none"
+        if not self._is_egovla:
+            action_contract = action_contract_from_checkpoint(
+                str(model_path),
+                explicit=model_cfg.get("action_contract"),
+            )
+        if action_contract == "relative":
+            # GitHub RLDX: arms are q_target - q_current; hands stay absolute.
+            from . import spark_joint54_relative_config as _spark_joint54_config  # noqa: F401
+            print("[RLDX_1] SparkArena action contract: arms relative, hands absolute")
+        elif action_contract == "absolute" or "sparkarena" in path_text or "joint54" in path_text:
+            # Legacy absolute-action SparkArena / joint54 checkpoints.
             from . import spark_joint54_config as _spark_joint54_config  # noqa: F401
+            print("[RLDX_1] SparkArena action contract: all joints absolute")
         try:
             import rldx
             from rldx.policy.rldx_policy import RLDXPolicy
@@ -191,6 +230,10 @@ class Model(ModelTemplate):
             None if swap_cfg is None else bool(swap_cfg),
             checkpoint_path=hint,
         )
+        if self._is_egovla and self._swap_rgb_bgr:
+            raise ValueError(
+                "EgoVLA RLDX checkpoints require RGB input with swap_rgb_bgr=false"
+            )
         self._task_name = str(model_cfg.get("task_name") or "").strip()
         self._logged_instruction_align = False
         if self._instruction_style == "short_name":
@@ -301,13 +344,24 @@ class Model(ModelTemplate):
 
         images: dict[str, np.ndarray] = {}
         for native_key, xpl_key in self.camera_map.items():
-            try:
-                image = np.asarray(vision[xpl_key]["color"])
-            except KeyError as exc:
-                raise KeyError(f"missing RGB camera observation vision.{xpl_key}.color") from exc
+            camera = vision.get(xpl_key)
+            color = camera.get("color") if isinstance(camera, dict) else None
+            if color is None:
+                is_wrist = native_key in {"cam_left_wrist", "cam_right_wrist"}
+                if self._is_egovla and is_wrist and self.missing_wrist_policy == "black":
+                    image = np.zeros((*self.input_image_size, 3), dtype=np.uint8)
+                else:
+                    raise KeyError(f"missing RGB camera observation vision.{xpl_key}.color")
+            else:
+                image = np.asarray(color)
             if image.ndim != 3 or image.shape[-1] != 3:
                 raise ValueError(
                     f"vision.{xpl_key}.color must be HWC RGB, got shape {image.shape}"
+                )
+            if self._is_egovla and image.shape[:2] != self.input_image_size:
+                raise ValueError(
+                    f"vision.{xpl_key}.color must match EgoVLA training resolution "
+                    f"{self.input_image_size}, got {image.shape[:2]}"
                 )
             if image.dtype != np.uint8:
                 raise TypeError(
